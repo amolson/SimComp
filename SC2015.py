@@ -7,6 +7,7 @@ Created on Wed Feb 11 08:34:05 2015
 
 import pygame, sys
 from pygame.locals import *
+import random
 
 #Initialize code
 pygame.init()
@@ -45,7 +46,7 @@ for i in mnem:
     for j in i:
         mnemflat.append(j)
         
-command = ['RUN', 'RNS', 'NEW', 'RST', 'LOD', 'LOA', 'END']
+command = ['RUN', 'RNS', 'NEW', 'RST', 'LOD', 'LOA', 'END', 'CPR']
 
 #pull from tuple
 X = 0
@@ -81,6 +82,10 @@ opBaseLocation = (65, 5)
 baseBaseLocation = (54, 5)
 
 memloc = 0
+
+counter = 0
+
+step = False
 
 #Fonts
 memAddressFont = pygame.font.Font(None, 25)
@@ -191,10 +196,13 @@ def drawButton(string, location):
 def checkLoad(larray):
     """Verifies user input and standardizes format into 3 and Number, 
     if any. Input is the line array."""
-    if '=' == larray[0][2]:
-        larray[0] = larray[0][3:]
-    elif '=' == larray[0][1]:
-        larray[0] = larray[0][2:]
+    try:
+        if '=' == larray[0][2]:
+            larray[0] = larray[0][3:]
+        elif '=' == larray[0][1]:
+            larray[0] = larray[0][2:]
+    except IndexError:
+        return 'UDF', 'NAN'
     iscmd = larray[0][:3]
     numflag = True
     number = 0
@@ -344,63 +352,241 @@ while True:
         CPU = [0, '', '', '', '', '']
         cmd = ''
         
+    if cmd == 'CPR':
+        CPU = [0, '', '', '', '', '']
+        counter = 0
+        cmd = ''
+        
 #Mnemonic handling
 
-if cmd == 'LDA' and evalm:
-    CPU[1] = ML[nbr]
-    evalm = False
+    if cmd == 'STP' and evalm:  #Op code 000, not in manual
+        Lines.insert(0, "?")
+        Lines = Lines[:5]
+        runflag = False
+        evalm = False
+
+    if cmd == 'LDA' and evalm:   #Op code 001, load accumulator
+        CPU[1] = ML[int(nbr)]
+        evalm = False
+        
+    if cmd == 'STA' and evalm:   #Op code 002, store accumulator
+        ML[int(nbr)] = CPU[1]
+        evalm = False
+            
+    if cmd == "ADD" and evalm: #Op Code 003
+        CPU[1] = int(CPU[1]) + int(ML[int(nbr)])
+        evalm = False
+        
+    if cmd == "SUB" and evalm: #Op Code 004
+        CPU[1] = int(CPU[1]) - int(ML[int(nbr)])
+        evalm = False
+        
+    if cmd == "MUL" and evalm: #Op Code 005
+        CPU[1] = int(CPU[1]) * int(ML[int(nbr)])
+        evalm = False
     
-if cinst == "ADD" and evalm: #Op Code 3
-    cpu[1] = ML[nbr] + int(cpu[1])
-    evalm = False
+    if cmd == "DIV" and evalm: #Op Code 006
+        try:
+            CPU[1] = int(CPU[1]) / int(ML[int(nbr)])
+        except ZeroDivisionError:
+            Lines.insert(0, 'DVZ!')
+        evalm = False
+        
+    if cmd == "INP" and evalm: #Op Code 007, input to location
+        inputflag = True
+        runflag = False
+        evalm = False
+        lines.insert(0, "?")
+        lines = lines[:5]
+        
+    if cmd == 'OUT' and evalm: #Op code 008, output from accumulator
+        Lines.insert(0, CPU[1])
+        Lines = Lines[:5]
+        evalm = False
+        
+    if cmd == 'JMP' and evalm: #Op code 009, jump to location
+        counter = 1
+        CPU[3] = int(nbr)
+        CPU[2] = ''            
+        evalm = False
+        
+    if cmd == 'MOD' and evalm: #Op code 00a, modulo
+        CPU[1] = int(CPU[1]) % int(ML[int(nbr)])
+        evalm = False
+        
+    if cmd == 'NEG' and evalm: #Op code 00b, negates value in accumulator
+        CPU[1] = 0 - int(CPU[1])
+        evalm = False
+        
+    if cmd == 'TRP' and evalm: #Op code 00c, stop and output value in accumulator
+        Lines.insert(0, str(CPU[1]))
+        Lines = Lines[:5]
+        runflag = False
+        evalm = False
+        
+    if cmd == 'RND' and evalm: #Op code 00d, random number between 0 and 100
+        CPU[1] = random.randrange(0, 100)
+        evalm = False
+        
+    if cmd == 'SKZ' and evalm:
+        counter = 1
+        if int(cpu[1]) == 0:
+            CPU[3] += 1
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+
+    if cmd == 'SNZ' and evalm:
+        counter = 1
+        if int(cpu[1]) != 0:
+            CPU[3] += 1
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+
+    if cmd == 'SLZ' and evalm:
+        counter = 1
+        if int(cpu[1]) < 0:
+            CPU[3] += 1
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'SGZ' and evalm:
+        counter = 1
+        if int(cpu[1]) > 0:
+            CPU[3] += 1
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'SPS' and evalm:
+        counter = 1
+        if int(cpu[1]) >= 0:
+            CPU[3] += 1
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'SNG' and evalm:
+        counter = 1
+        if int(cpu[1]) <= 0:
+            CPU[3] += 1
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'JPZ' and evalm:
+        counter = 1
+        if int(cpu[1]) == 0:
+            CPU[3] = int(nbr)
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+
+    if cmd == 'JNZ' and evalm:
+        counter = 1
+        if int(cpu[1]) != 0:
+            CPU[3] = int(nbr)
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+
+    if cmd == 'JLZ' and evalm:
+        counter = 1
+        if int(cpu[1]) < 0:
+            CPU[3] = int(nbr)
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'JGZ' and evalm:
+        counter = 1
+        if int(cpu[1]) > 0:
+            CPU[3] = int(nbr)
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'JPS' and evalm:
+        counter = 1
+        if int(cpu[1]) >= 0:
+            CPU[3] = int(nbr)
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
+        
+    if cmd == 'JNG' and evalm:
+        counter = 1
+        if int(cpu[1]) <= 0:
+            CPU[3] = int(nbr)
+            CPU[2] = ''
+        else:
+            CPU[2] = ''
+        evalm = False
     
 #Run handling
-        if runflag:
-#            bc += 1        
-#            if bc >= 30 and run == "free":
-#                counter += 1
-#                if counter == 1:
-#                    cpu['PC'] = 0
-#                    cpu['FETCH'] = 0
-#                    cpu['EXEC'] = ''
-#                    step = False
-#                if counter == 2:
-#                    cpu['FETCH'] = cpu['PC']
-#                    cpu['IR'] = mem[cpu['FETCH']]
-#                    cpu['INC'] = 'PC'
-#                    step = False
-#                if counter == 3:
-#                    cpu['EXEC'] = cpu['IR'][:3]
-#                    if cpu['INC'] == 'PC':
-#                        cpu['PC'] += 1
-#                        cpu['INC'] = ''
-#                    trigger = True
-#                    step = False
-#                    counter = 1
-#                bc = 0
-            if step == True and runtypeflag == "Step":
-                counter += 1
-                if counter == 1:
-                    cpu['PC'] = 0
-                    cpu['FETCH'] = 0
-                    cpu['EXEC'] = ''
-                    step = False
-                if counter == 2:
-                    cpu['FETCH'] = cpu['PC']
-                    cpu['IR'] = mem[cpu['FETCH']]
-                    cpu['INC'] = 'PC'
-                    step = False
-                if counter == 3:
-                    cpu['EXEC'] = cpu['IR'][:3]
-                    if cpu['INC'] == 'PC':
-                        cpu['PC'] += 1
-                        cpu['INC'] = ''
-                    evalm = True
-                    step = False
-                    counter = 1
-            cmem = cpu['IR']
-            cinst = cmem[:3]
-            cnum = cmem[3:]
+    if runflag:
+    #            bc += 1        
+    #            if bc >= 30 and run == "free":
+    #                counter += 1
+    #                if counter == 1:
+    #                    cpu['PC'] = 0
+    #                    cpu['FETCH'] = 0
+    #                    cpu['EXEC'] = ''
+    #                    step = False
+    #                if counter == 2:
+    #                    cpu['FETCH'] = cpu['PC']
+    #                    cpu['IR'] = mem[cpu['FETCH']]
+    #                    cpu['INC'] = 'PC'
+    #                    step = False
+    #                if counter == 3:
+    #                    cpu['EXEC'] = cpu['IR'][:3]
+    #                    if cpu['INC'] == 'PC':
+    #                        cpu['PC'] += 1
+    #                        cpu['INC'] = ''
+    #                    trigger = True
+    #                    step = False
+    #                    counter = 1
+    #                bc = 0
+        if step == True and runtypeflag == "Step":
+            counter += 1
+            if counter == 1:
+                CPU[3] = 0
+                CPU[4] = 0
+                CPU[0] = ''
+                step = False
+            if counter == 2:
+                CPU[4] = CPU[3]
+                CPU[5] = ML[CPU[4]]
+                CPU[2] = 'PC'
+                step = False
+            if counter == 3:
+                CPU[0] = CPU[5][:3]
+                if CPU[2] == 'PC':
+                    CPU[3] += 1
+                    CPU[2] = ''
+                evalm = True
+                step = False
+                counter = 1
+        cmem = CPU[5]
+        try:
+            cmd = cmem[:3]
+            nbr = cmem[3:]
+        except:
+            cmd = 'UDF'
+            nbr = ''
 
 #User event handling        
     for event in pygame.event.get():
@@ -431,17 +617,17 @@ if cinst == "ADD" and evalm: #Op Code 3
                 pygame.event.post(pygame.event.Event(QUIT))
             if event.key == pygame.K_ESCAPE:
                 if runflag == True:
+                    Lines[0] = 'STP'
+                    Lines.insert(0, '?')
                     runflag = False
                 else:
                     Lines[0] =  Lines[0][:-1] + (chr(event.key)).upper() + "?"
             if event.key == pygame.K_SPACE and runflag == True:
                     step = True
             if event.key == pygame.K_BACKSPACE or event.key == pygame.K_DELETE:
-                print 'check backspace'
                 Lines[0] = Lines[0][:-2] + "?"
             elif event.key == pygame.K_RETURN:
                 cmd, nbr = checkLoad(Lines)
-                print cmd, nbr
                 if loadflag == False and inputflag == False:
                     if cmd in command or cmd in mnemflat:
                         if nbr != 'NAN':
@@ -460,7 +646,7 @@ if cinst == "ADD" and evalm: #Op Code 3
                     else:
                         if nbr == 'NAN':
                             ML[memloc] = cmd
-                            Lines[0] = str(memloc) + cmd
+                            Lines[0] = str(memloc) + '=' + cmd
                         else:
                             ML[memloc] = cmd + str(nbr)
                             Lines[0] = str(memloc) + '=' + cmd + str(nbr)
@@ -470,6 +656,8 @@ if cinst == "ADD" and evalm: #Op Code 3
                 if inputflag:
                     CPU[1] = nbr
                     inputflag = False
+                    runflag = True
+                    evalm = False
             elif runflag == False and event.key != pygame.K_ESCAPE:
                 try:
                     Lines[0] =  Lines[0][:-1] + (chr(event.key)).upper() + "?"
